@@ -55,4 +55,3 @@ dependencies:
     - scipy==1.9.1
     - six==1.16.0
     - xarray==2022.9.0
-prefix: /home/mattiasthalen/miniconda3
