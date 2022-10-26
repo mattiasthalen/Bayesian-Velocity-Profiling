@@ -693,8 +693,8 @@ def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, 
     if ax is None:
         ax = plt.gca()
 
-    ax.scatter(df.index, df[data_var], marker = '.', alpha = 0.6, color = 'gray', zorder = 3)
-    ax.plot(df.index, df['process_average'], linestyle = '--', color = 'gray', zorder = 3)
+    ax.scatter(df.index, df[data_var], marker = '.', alpha = 0.6, color = 'slategray', zorder = 3)
+    ax.plot(df.index, df['process_average'], linestyle = '--', color = 'slategray', zorder = 3, linewidth = 1)
 
     colors = {'lower': ['#f7f7f7', '#f4a582', '#ca0020'],
               'upper': ['#f7f7f7', '#92c5de', '#0571b0']}
