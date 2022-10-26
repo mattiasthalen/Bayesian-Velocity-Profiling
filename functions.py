@@ -626,7 +626,7 @@ def plot_last_session_predictions(inference_data,
 
     plt.draw()
 
-def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, **kwargs):
+def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, display_df = False, **kwargs):
     df = (ds[data_var].sel({'exercise': exercise}, drop = True)
                       .pint.dequantify()
                       .to_dataframe()
@@ -680,27 +680,36 @@ def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, 
             df['process_average'].iat[row] =  df['process_average'][row - 1]
             df['process_range'].iat[row] =  df['process_range'][row - 1]
 
-    df['lower_limit_1'] = df['process_average'] - df['process_range']/1.128
-    df['upper_limit_1'] = df['process_average'] + df['process_range']/1.128
-    df['lower_limit_2'] = df['process_average'] - df['process_range']*2/1.128
-    df['upper_limit_2'] = df['process_average'] + df['process_range']*2/1.128
-    df['lower_limit_3'] = df['process_average'] - df['process_range']*3/1.128
-    df['upper_limit_3'] = df['process_average'] + df['process_range']*3/1.128
+    zones = 3
+
+    for i in np.arange(zones):
+        offset = df['process_range']*(i + 1)/1.128
+        df[f'lower_limit_{i}'] = df['process_average'] - offset
+        df[f'upper_limit_{i}'] = df['process_average'] + offset
+
+    if display_df:
+        display(df)
 
     if ax is None:
         ax = plt.gca()
 
-    ax.scatter(df.index, df[data_var], marker = '.', alpha = 0.6)
-    ax.plot(df.index, df['process_average'])
-    ax.plot(df.index, df['lower_limit_3'])
-    ax.plot(df.index, df['upper_limit_3'])
+    ax.scatter(df.index, df[data_var], marker = '.', alpha = 0.6, color = 'gray', zorder = 3)
+    ax.plot(df.index, df['process_average'], linestyle = '--', color = 'gray', zorder = 3)
 
-    ax.fill_between(df.index,df['lower_limit_1'], df['upper_limit_1'], alpha = 0.3)
+    colors = {'lower': ['#f7f7f7', '#f4a582', '#ca0020'],
+              'upper': ['#f7f7f7', '#92c5de', '#0571b0']}
 
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.tick_params(labelrotation = 90)
-    ax.grid()
+    for i in np.arange(zones):
+        prev_i = np.max([0, i - 1])
+
+        for level in ['lower', 'upper']:
+            ax.plot(df.index, df[f'{level}_limit_{i}'], linewidth = 0.5, alpha = 0.6, color = colors[level][i], zorder = 2)
+
+            if i > 0:
+                ax.fill_between(df.index,df[f'{level}_limit_{i}'], df[f'{level}_limit_{prev_i}'], alpha = 0.3, color = colors[level][i], zorder = 1, label = f'Zone {i + 1} ({level})')
+
+        if i == 0:
+            ax.fill_between(df.index,df[f'lower_limit_{i}'], df[f'upper_limit_{prev_i}'], alpha = 0.3, color = colors['lower'][i], zorder = 1, label = 'Zone 1')
 
     return ax
 
