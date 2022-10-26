@@ -35,6 +35,28 @@ def extract_kpis(velocity, load):
 
     return kpis
 
+def extract_session_kpi_dict(inference_data, df):
+
+    kpis = {session: {} for session in df['session'].unique()}
+
+    mean_predictions = inference_data['predictions']['mu_std_rescaled'].mean(['chain', 'draw'])
+    x_observations = inference_data['predictions_constant_data']['velocity_std_rescaled']
+
+    for session, val in kpis.items():
+        filter = df['session'] == session
+        observations = df[filter]['observation'].values
+
+        y_model_mean = mean_predictions.sel(observation = observations)
+        x = x_observations.sel(observation = observations)
+
+        zero_load_velocity, zero_velocity_load, area_under_curve = extract_kpis(x, y_model_mean)
+
+        kpis[session]['zero_load_velocity'] = zero_load_velocity
+        kpis[session]['zero_velocity_load'] = zero_velocity_load
+        kpis[session]['area_under_curve'] = area_under_curve
+
+    return kpis
+
 def assign_set_type(da, **kwargs):
     set_category = xr.where(da['set'] < da.idxmax('set'), 'Work Up', np.nan)
     set_category = xr.where(da['set'] == da.idxmax('set'), 'Top Set', set_category)
@@ -474,9 +496,9 @@ def sample_model(model, csv_path, inference_path):
 
 ### Plotting functions
 def plot_last_session_predictions(inference_data,
-                                df,
-                                exercises,
-                                hdi_prob = 0.8):
+                                  df,
+                                  exercises,
+                                  hdi_prob = 0.8):
     n_exercises = len(exercises)
 
     n_rows = np.ceil(n_exercises / 2).astype(int)
@@ -671,3 +693,5 @@ def plot_kpis(ds, exercise, vars, **kwargs):
     fig.supxlabel('Workout Start Time')
 
     plt.draw()
+
+    
