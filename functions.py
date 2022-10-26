@@ -35,27 +35,55 @@ def extract_kpis(velocity, load):
 
     return kpis
 
-def extract_session_kpi_dict(inference_data, df):
+def create_kpi_dataset(inference_data, df):
 
-    kpis = {session: {} for session in df['session'].unique()}
+    sessions = df['session'].unique()
+    zero_load_velocity = []
+    zero_velocity_load = []
+    area_under_curve = []
 
     mean_predictions = inference_data['predictions']['mu_std_rescaled'].mean(['chain', 'draw'])
     x_observations = inference_data['predictions_constant_data']['velocity_std_rescaled']
 
-    for session, val in kpis.items():
+    for session in sessions:
         filter = df['session'] == session
         observations = df[filter]['observation'].values
 
         y_model_mean = mean_predictions.sel(observation = observations)
         x = x_observations.sel(observation = observations)
 
-        zero_load_velocity, zero_velocity_load, area_under_curve = extract_kpis(x, y_model_mean)
+        kpis = extract_kpis(x, y_model_mean)
+        zero_load_velocity.append(kpis[0])
+        zero_velocity_load.append(kpis[1])
+        area_under_curve.append(kpis[2])
+    
+    dict = {
+        'coords': {
+            'session': {
+                'dims': 'session',
+                'data': sessions,
+            }
+        },
+        'dims': 'session',
+        'data_vars': {
+            'zero_load_velocity': {
+                'dims': 'session',
+                'data': zero_load_velocity
+            },
+            'zero_velocity_load': {
+                'dims': 'session',
+                'data': zero_velocity_load
+            },
+            'area_under_curve': {
+                'dims': 'session',
+                'data': area_under_curve
+            }
+        }
+    }
+    
+    dataset = xr.Dataset.from_dict(dict)
 
-        kpis[session]['zero_load_velocity'] = zero_load_velocity
-        kpis[session]['zero_velocity_load'] = zero_velocity_load
-        kpis[session]['area_under_curve'] = area_under_curve
-
-    return kpis
+    return dataset
 
 def assign_set_type(da, **kwargs):
     set_category = xr.where(da['set'] < da.idxmax('set'), 'Work Up', np.nan)
@@ -322,6 +350,23 @@ def load_data(csv_path, **kwargs):
     ds = dataframe_to_dataset(df, **kwargs)
 
     return ds
+
+def merge_by_coord_dimension(ds_a, ds_b, coord_dimension, data_vars):
+    ds_merged = ds_a.copy()
+
+    shape = ds_merged[coord_dimension].shape
+    dims = ds_merged[coord_dimension].dims
+
+    for data_var in data_vars:
+        data = np.full_like(ds_merged[coord_dimension].values.flatten().astype('float64'), np.nan)
+
+        for coord in ds_merged[coord_dimension].values.flatten():
+            if coord in ds_b[coord_dimension].values.flatten():
+                data[coord] = ds_b.sel({coord_dimension: coord})[data_var].values.flatten()
+
+        ds_merged[data_var] = (dims, data.reshape(shape))
+
+    return ds_merged
 
 def extract_training_data(ds, **kwargs):
     df = (ds[['load', 'set_velocities', 'observation', 'session']]
