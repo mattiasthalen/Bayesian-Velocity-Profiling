@@ -17,6 +17,7 @@ from urllib.parse import unquote
 
 from urllib.parse import unquote
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 
 from typing import Callable, Optional, Dict, List, Union, NoReturn
 
@@ -626,20 +627,20 @@ def plot_last_session_predictions(inference_data,
     plt.draw()
 
 def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, **kwargs):
-    df = ds[data_var].sel({'exercise': exercise}, drop = True)\
-                    .drop_vars(['training_cycle', 'cycle_type', 'max_weight_pr_flag'])\
-                    .to_dataframe()\
-                    .dropna()
+    df = (ds[data_var].sel({'exercise': exercise}, drop = True)
+                      .pint.dequantify()
+                      .to_dataframe()
+                      .dropna())
     
-    df['moving_average'] = df[data_var].sort_index(ascending = False)\
-                                    .rolling(window, min_periods = 1)\
-                                    .mean()
+    df['moving_average'] = (df[data_var].sort_index(ascending = False)
+                                        .rolling(window, min_periods = 1)
+                                        .mean())
     
-    df['moving_range'] = df[data_var].diff(-1)\
-                                    .abs()\
-                                    .sort_index(ascending = False)\
-                                    .rolling(window, min_periods = 1)\
-                                    .mean()
+    df['moving_range'] = (df[data_var].diff(-1)
+                                      .abs()
+                                      .sort_index(ascending = False)
+                                      .rolling(window, min_periods = 1)
+                                      .mean())
 
     df['process_average'] = df['moving_average']
     df['process_range'] = df['moving_range']
@@ -658,26 +659,26 @@ def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, 
 
         signal_start_id = np.max([8, row - signal_window])
 
-        df['signal_min'][row] = df[data_var][signal_start_id:row].min()
-        df['signal_max'][row] = df[data_var][signal_start_id:row].max()
+        df['signal_min'].iat[row] = df[data_var][signal_start_id:row].min()
+        df['signal_max'].iat[row] = df[data_var][signal_start_id:row].max()
 
-        df['signal_above_average'][row] = (df['signal_min'][row] > df['process_average'][row - 1])
-        df['signal_below_average'][row] = (df['signal_max'][row] < df['process_average'][row - 1])
+        df['signal_above_average'].iat[row] = (df['signal_min'][row] > df['process_average'][row - 1])
+        df['signal_below_average'].iat[row] = (df['signal_max'][row] < df['process_average'][row - 1])
 
         signal_open = (first_row) | (row >= previous_signal_id + window)
         signal = (signal_open) & (sufficient_rows_left) & (first_row | df['signal_above_average'][row] | df['signal_below_average'][row])
-        df['signal'][row] = signal
+        df['signal'].iat[row] = signal
         
-        df['process_average'][row] =  df['process_average'][row - 1]
-        df['process_range'][row] =  df['process_range'][row - 1]
+        df['process_average'].iat[row] =  df['process_average'][row - 1]
+        df['process_range'].iat[row] =  df['process_range'][row - 1]
 
         if signal:
             previous_signal_id = row
-            df['process_average'][row] =  df['moving_average'][row]
-            df['process_range'][row] =  df['moving_range'][row]
+            df['process_average'].iat[row] =  df['moving_average'][row]
+            df['process_range'].iat[row] =  df['moving_range'][row]
         else:
-            df['process_average'][row] =  df['process_average'][row - 1]
-            df['process_range'][row] =  df['process_range'][row - 1]
+            df['process_average'].iat[row] =  df['process_average'][row - 1]
+            df['process_range'].iat[row] =  df['process_range'][row - 1]
 
     df['lower_limit_1'] = df['process_average'] - df['process_range']/1.128
     df['upper_limit_1'] = df['process_average'] + df['process_range']/1.128
@@ -698,45 +699,47 @@ def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, 
 
     ax.set_xlabel('')
     ax.set_ylabel('')
-    #ax.set_ylim([0, None])
     ax.tick_params(labelrotation = 90)
     ax.grid()
 
     return ax
 
-def plot_kpis(ds, exercise, vars, **kwargs):
-    var_titles = [var.title().replace('_', ' ').replace('1Rm', '1RM') for var in vars]
+def plot_kpis(ds, exercise, vars, figsize = None, n_cols = None, ylim = None, legend = False, **kwargs):
+    title_format = lambda x: x.title().replace('_', ' ')
+
+    var_titles = [title_format(var) for var in vars]
 
     n_vars = len(vars)
 
-    n_cols = 1
+    if n_cols is None:
+        n_cols = 2 if n_vars > 1 else 1
 
-    if n_vars > 1:
-        n_cols = 2
+    n_rows = np.ceil(n_vars/n_cols).astype(int) if n_vars > 2 else 1
     
-    n_rows = 1
-
-    if n_vars > 2:
-        n_rows = np.ceil(n_vars/n_cols).astype(int)
-    
-    figsize = np.array([6, 3]) * [n_cols, n_rows]
+    figsize = np.array([6, 3]) * [n_cols, n_rows] if figsize is None else figsize
 
     fig, axes = plt.subplots(ncols = n_cols,
-                            nrows = n_rows,
-                            constrained_layout = True,
-                            figsize = figsize,
-                            sharex = True)
+                             nrows = n_rows,
+                             constrained_layout = True,
+                             figsize = figsize,
+                             sharex = True)
     
-    axes = [ax for row in axes for ax in row]
+    axes = axes.flatten() if n_vars > 1 else [axes]
 
     for key, val in enumerate(vars):
-        plot_pbc(ds, exercise, vars[key], ax = axes[key])
+        plot_pbc(ds, exercise, vars[key], ax = axes[key], **kwargs)
         title = var_titles[key]
-        axes[key].set_title(title)
+        axes[key].set_title(title, fontweight = 'bold')
+        axes[key].tick_params(labelrotation = 90)
+        axes[key].grid(True)
+        
+        if legend:
+            axes[key].legend()
 
-    fig.suptitle(f'{exercise.title()} KPIs', fontsize = 16)
+        if ylim is not None:
+            axes[key].set_ylim(ylim)
+
+    fig.suptitle(exercise.upper(), fontsize = 16, fontweight = 'bold')
     fig.supxlabel('Workout Start Time')
 
     plt.draw()
-
-    
