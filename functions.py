@@ -352,22 +352,12 @@ def load_data(csv_path, **kwargs):
 
     return ds
 
-def merge_by_coord_dimension(ds_a, ds_b, coord_dimension, data_vars):
-    ds_merged = ds_a.copy()
+def left_join_datasets(dataset_a, dataset_b, dimension):
+    all_c_levels = np.unique(dataset_a[dimension].values)
+    dataset_b_reindexed = dataset_b.reindex({dimension: all_c_levels})
+    dataset_c = xr.merge([dataset_a, dataset_b_reindexed.sel({dimension: dataset_a[dimension]})])
 
-    shape = ds_merged[coord_dimension].shape
-    dims = ds_merged[coord_dimension].dims
-
-    for data_var in data_vars:
-        data = np.full_like(ds_merged[coord_dimension].values.flatten().astype('float64'), np.nan)
-
-        for coord in ds_merged[coord_dimension].values.flatten():
-            if coord in ds_b[coord_dimension].values.flatten():
-                data[coord] = ds_b.sel({coord_dimension: coord})[data_var].values.flatten()
-
-        ds_merged[data_var] = (dims, data.reshape(shape))
-
-    return ds_merged
+    return dataset_c
 
 def extract_training_data(ds, **kwargs):
     df = (ds[['load', 'set_velocities', 'observation', 'session']]
