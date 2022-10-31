@@ -683,8 +683,8 @@ def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, 
     if ax is None:
         ax = plt.gca()
 
-    ax.scatter(df.index, df[data_var], marker = '.', alpha = 0.6, color = 'slategray', zorder = 3)
-    ax.plot(df.index, df['process_average'], linestyle = '--', color = 'slategray', zorder = 3, linewidth = 1.5)
+    ax.scatter(df.index, df[data_var], marker = '.', alpha = 0.3, color = 'slategray', zorder = 3)
+    ax.plot(df.index, df['process_average'], linestyle = '--', color = 'slategray', zorder = 3, linewidth = 1)
 
     colors = {'lower': ['#f7f7f7', '#f4a582', '#ca0020'],
               'upper': ['#f7f7f7', '#92c5de', '#0571b0']}
@@ -692,14 +692,12 @@ def plot_pbc(ds, exercise, data_var, window = 20, signal_window = 8, ax = None, 
     for i in np.arange(zones):
         prev_i = np.max([0, i - 1])
 
-        for level in ['lower', 'upper']:
-            ax.plot(df.index, df[f'{level}_limit_{i}'], linewidth = 0.5, alpha = 0.9, color = colors[level][i], zorder = 2)
-
-            if i > 0:
-                ax.fill_between(df.index,df[f'{level}_limit_{i}'], df[f'{level}_limit_{prev_i}'], alpha = 0.5, color = colors[level][i], zorder = 1, label = f'Zone {i + 1} ({level})')
+        if i > 0:
+            for level in ['lower', 'upper']:
+                ax.fill_between(df.index, df[f'{level}_limit_{i}'], df[f'{level}_limit_{prev_i}'], alpha = 0.5, color = colors[level][i], zorder = 1, label = f'Zone {i + 1} ({level})', linewidth = 0)
 
         if i == 0:
-            ax.fill_between(df.index,df[f'lower_limit_{i}'], df[f'upper_limit_{prev_i}'], alpha = 0.5, color = colors['lower'][i], zorder = 1, label = 'Zone 1')
+            ax.fill_between(df.index, df[f'lower_limit_{i}'], df[f'upper_limit_{prev_i}'], alpha = 0.5, color = colors['lower'][i], zorder = 1, label = 'Zone 1', linewidth = 0)
 
     return ax
 
